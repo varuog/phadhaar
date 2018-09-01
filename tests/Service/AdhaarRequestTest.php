@@ -5,17 +5,20 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-namespace tests\Phadhaar\Model;
+namespace tests\Phadhaar\Service;
 
 use PHPUnit\Framework\TestCase;
+use Phadhaar\Service\AdhaarAuthService;
+use GuzzleHttp\Client;
 use Phadhaar\Model\User;
+use Phadhaar\Service\AdhaarAuthRequest;
 
 /**
  * Description of User
  *
  * @author gourav sarkar
  */
-class UserTest extends TestCase
+class AdhaarRequestTest extends TestCase
 {
 
     /**
@@ -25,7 +28,10 @@ class UserTest extends TestCase
     public function userProvider()
     {}
 
-    public function testUserWithDemography()
+    /**
+     * 
+     */
+    public function testSessionKey()
     {
         $user = new User();
         $user->setEmail('sschoudhury@dummyemail.com');
@@ -33,7 +39,14 @@ class UserTest extends TestCase
         $user->setDob('13-05-1968');
         $user->setName('Shivshankar Choudhury');
         $user->setAdhaarNumber('999941057058');
-
-       // $this->assertEquals(1, serialize($user));
+        
+        $adhaar=new AdhaarAuthRequest($user);
+        $payload=$adhaar->sign();
+        //var_dump(serialize($adhaar), 1);
+        //for debug
+        file_put_contents('test.xml',$payload); 
+        //$this->assertEquals($payload, 1);
+        
+        
     }
 }

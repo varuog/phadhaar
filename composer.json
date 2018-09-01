@@ -12,7 +12,9 @@
     "minimum-stability": "stable",
     "require": {
         "guzzlehttp/guzzle": "~6.0",
-        "nesbot/carbon": "^1.33"
+        "nesbot/carbon": "^1.33",
+        "marcelxyz/php-xml-digital-signature": "^1.0",
+        "robrichards/xmlseclibs": "^3.0"
     },
     "autoload": {
         "classmap": [
