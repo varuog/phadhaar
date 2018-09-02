@@ -33,19 +33,19 @@ class AdhaarRequestTest extends TestCase
      */
     public function testSessionKey()
     {
-        $user = new User();
-        $user->setEmail('sschoudhury@dummyemail.com');
-        $user->setGender(User::GENDER_MALE);
-        $user->setDob('13-05-1968');
-        $user->setName('Shivshankar Choudhury');
-        $user->setAdhaarNumber('999941057058');
+//         $user = new User();
+//         $user->setEmail('sschoudhury@dummyemail.com');
+//         $user->setGender(User::GENDER_MALE);
+//         $user->setDob('13-05-1968');
+//         $user->setName('Shivshankar Choudhury');
+//         $user->setAdhaarNumber('999941057058');
         
-        $adhaar=new AdhaarAuthRequest($user);
-        $payload=$adhaar->sign();
-        //var_dump(serialize($adhaar), 1);
-        //for debug
-        file_put_contents('test.xml',$payload); 
-        //$this->assertEquals($payload, 1);
+//         $adhaar=new AdhaarAuthRequest($user);
+//         $payload=$adhaar->sign();
+//         //var_dump(serialize($adhaar), 1);
+//         //for debug
+//         file_put_contents('test.xml',$payload); 
+//         //$this->assertEquals($payload, 1);
         
         
     }

@@ -1,5 +1,7 @@
 <?php
-namespace src\Service;
+namespace Phadhaar\Service;
+
+use Psr\Http\Message\StreamInterface;
 
 /**
  *
@@ -9,22 +11,26 @@ namespace src\Service;
 class AdhaarAuthResponse
 {
 
-    protected $rawResponse;
+    protected $streamResponse;
+    protected $simpleXml;
     /**
      */
-    public function __construct($response)
+    public function __construct(StreamInterface $response)
     {
-        $this->rawResponse=$response;
+        $this->streamResponse=$response->getContents();
+        //var_dump($this->streamResponse);
+        $this->simpleXml=new \SimpleXMLElement( $this->streamResponse);
     }
     
     public function getRawResponse()
     {
-        return $this->rawResponse;
+        return $this->streamResponse;
     }
     
-    public function getRawResponseBody()
+    public function getXmlResponse()
     {
-        
+        return $this->simpleXml;
     }
+
 }
 

@@ -126,16 +126,16 @@ class User implements \Serializable
 
     /**
      */
-    protected $nameMatchValue;
+    protected $nameMatchValue = 100;
 
     // default 100
-    protected $nameMatchStrategy;
+    protected $nameMatchStrategy = 'E';
 
     // default ''E'
     protected $addressMatchStrategy = 'E';
 
     // default E, E/P for full address
-    protected $addressMatchValue;
+    protected $addressMatchValue = 100;
 
     // default E, E/P for full address
 
@@ -182,7 +182,7 @@ class User implements \Serializable
         /*
          * YYYY-MM-DDThh:mm:ss
          */
-        $this->ts = \Carbon\Carbon::now()->toIso8601String();
+        $this->ts = \Carbon\Carbon::now('Asia/Kolkata')->format('Y-m-d\TH:i:s');
         $this->pidVersion = self::PID_VERSION_2;
 
         $this->xmlWriter = new \XMLWriter();
@@ -426,14 +426,16 @@ class User implements \Serializable
     public function serialize()
     {
         $this->xmlWriter->openMemory();
-        // $this->xmlWriter->startDocument("1.0");
+        // $this->xmlWriter->startDocument("1.0", "utf-8");
         /*
          * Pid Block
          */
         $this->xmlWriter->startElement('Pid');
         $this->xmlWriter->writeAttribute('ts', $this->ts);
         $this->xmlWriter->writeAttribute('ver', $this->pidVersion);
-        $this->xmlWriter->writeAttribute('wadh', $this->ts);
+        if (isset($this->wadh)) {
+            $this->xmlWriter->writeAttribute('wadh', $this->wadh);
+        }
 
         /*
          * Demo Block
@@ -446,18 +448,33 @@ class User implements \Serializable
         /*
          * PI block self colsed
          */
-        $this->xmlWriter->startElement('Demo');
-        $this->xmlWriter->writeAttribute('ms', $this->nameMatchStrategy);
-        $this->xmlWriter->writeAttribute('mv', $this->nameMatchValue);
-        $this->xmlWriter->writeAttribute('name', $this->name);
-        $this->xmlWriter->writeAttribute('lname', $this->langNameValue);
-        $this->xmlWriter->writeAttribute('lmv', $this->langNameMatchValue);
-        $this->xmlWriter->writeAttribute('gender', $this->gender);
-        $this->xmlWriter->writeAttribute('dob', $this->dob);
-        $this->xmlWriter->writeAttribute('dobt', $this->dobt);
-        $this->xmlWriter->writeAttribute('age', $this->age);
-        $this->xmlWriter->writeAttribute('phone', $this->phone);
-        $this->xmlWriter->writeAttribute('email', $this->email);
+        $this->xmlWriter->startElement('Pi');
+        if (isset($this->name)) {
+            $this->xmlWriter->writeAttribute('name', $this->name);
+            $this->xmlWriter->writeAttribute('ms', $this->nameMatchStrategy);
+            $this->xmlWriter->writeAttribute('mv', $this->nameMatchValue);
+        }
+
+        if (isset($this->gender)) {
+            $this->xmlWriter->writeAttribute('gender', $this->gender);
+        }
+        if (isset($this->dob)) {
+            $this->xmlWriter->writeAttribute('dob', $this->dob);
+            $this->xmlWriter->writeAttribute('dobt', $this->dobt);
+        }
+        if (isset($this->langNameValue)) {
+            $this->xmlWriter->writeAttribute('lname', $this->langNameValue);
+            $this->xmlWriter->writeAttribute('lmv', $this->langNameMatchValue);
+        }
+        if (isset($this->age)) {
+            $this->xmlWriter->writeAttribute('age', $this->age);
+        }
+        if (isset($this->phone)) {
+            $this->xmlWriter->writeAttribute('phone', $this->phone);
+        }
+        if (isset($this->email)) {
+            $this->xmlWriter->writeAttribute('email', $this->email);
+        }
         $this->xmlWriter->endElement();
 
         /*
@@ -479,7 +496,7 @@ class User implements \Serializable
             $this->xmlWriter->writeAttribute('pc', $this->address['pc']);
             $this->xmlWriter->writeAttribute('po', $this->address['po']);
             $this->xmlWriter->endElement();
-        } else {
+        } else if (is_string($this->address)) {
             $this->xmlWriter->startElement('Pfa');
             $this->xmlWriter->writeAttribute('ms', $this->addressMatchStrategy);
             $this->xmlWriter->writeAttribute('mv', $this->addressMatchValue);
@@ -491,10 +508,12 @@ class User implements \Serializable
         /*
          * Otp/pin block
          */
-        $this->xmlWriter->startElement('Pv');
-        $this->xmlWriter->writeAttribute('otp', $this->otp);
-        $this->xmlWriter->writeAttribute('pin', $this->pin);
-        $this->xmlWriter->endElement();
+        if (isset($this->otp) || isset($this->pin)) {
+            $this->xmlWriter->startElement('Pv');
+            $this->xmlWriter->writeAttribute('otp', $this->otp);
+            $this->xmlWriter->writeAttribute('pin', $this->pin);
+            $this->xmlWriter->endElement();
+        }
 
         /*
          * Demo end
@@ -504,6 +523,7 @@ class User implements \Serializable
          * Pid End
          */
         $this->xmlWriter->endElement();
+        // $this->xmlWriter->endDocument();
 
         return $this->xmlWriter->outputMemory();
     }

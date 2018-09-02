@@ -12,6 +12,7 @@ use Phadhaar\Model\User;
 use Carbon\Carbon;
 use RobRichards\XMLSecLibs\XMLSecurityDSig;
 use RobRichards\XMLSecLibs\XMLSecurityKey;
+use Phadhaar\Exception\AdhaarValidationException;
 
 /**
  * Description of AdhaarAuthService
@@ -22,10 +23,11 @@ use RobRichards\XMLSecLibs\XMLSecurityKey;
 class AdhaarAuthRequest implements \Serializable
 {
 
-    const API_VERSION_2 = '2.0';
+    const API_VERSION_2 = '2.5';
 
-    const TEST_ADHAAR_ENDPOINT = 'https://auth.uidai.gov.in';
+    const TEST_ADHAAR_ENDPOINT = 'http://developer.uidai.gov.in/authserver';
 
+    // const TEST_ADHAAR_ENDPOINT = 'http://auth.uidai.gov.in';
     const TEST_ASA_LICENSE_KEY = 'MMxNu7a6589B5x5RahDW-zNP7rhGbZb5HsTRwbi-VVNxkoFmkHGmYKM';
 
     const TEST_AUA_LICENSE_KEY = 'MBni88mRNM18dKdiVyDYCuddwXEQpl68dZAGBQ2nsOlGMzC9DkOVL5s';
@@ -57,6 +59,11 @@ class AdhaarAuthRequest implements \Serializable
     protected $user;
 
     protected $enableProtoBuf = false;
+
+    /*
+     * Once sealed sign method cant be called
+     */
+    protected $isSealed = false;
 
     // X/P
 
@@ -164,10 +171,14 @@ class AdhaarAuthRequest implements \Serializable
         // var_dump($res,$publicKeyDetails);
     }
 
-    protected function generateHmac(\Phadhaar\Model\User $user)
+    protected function generateHmac()
     {
+        if (! isset($this->user)) {
+            throw new AdhaarValidationException('User Must be set');
+        }
+
         if (! $this->enableProtoBuf) {
-            $xmlPid = serialize($user);
+            $xmlPid = $this->user->serialize();
             // $hashXmlPid = hash($xmlPid, 'sha256');
             /*
              * encrypt
@@ -179,7 +190,12 @@ class AdhaarAuthRequest implements \Serializable
              * $res = openssl_public_encrypt($hashXmlPid, $crypted, $publicKeyDetails['key']);
              * $encryptedXmlPid = base64_encode($crypted);
              */
-            $encryptedXmlPid = hash_hmac('sha256', $xmlPid, $this->session, true);
+            // ncryptedXmlPid = hash_hmac('sha256', $xmlPid, $this->session, true);
+            $hashedPid = hash('sha256', $xmlPid);
+            $iv = $this->user->getTs();
+            $encryptedXmlPid = openssl_encrypt($hashedPid, 'aes-256-gcm', $this->session, OPENSSL_ZERO_PADDING, $iv, $tag);
+            // var_dump($encryptedXmlPid);
+            // $xm=openssl_decrypt($encryptedXmlPid, 'aes-256-gcm', $this->session,OPENSSL_ZERO_PADDING, $iv, $tag);var_dump($xm);
             $this->hmac = base64_encode($encryptedXmlPid);
             return;
         }
@@ -187,19 +203,30 @@ class AdhaarAuthRequest implements \Serializable
         throw new AdhaarNotSupportedException('ProtoBuf Not supported yet');
     }
 
-    protected function generatePidBlock(\Phadhaar\Model\User $user)
+    protected function generatePidBlock()
     {
-        $this->user = $user;
+        if (! isset($this->session)) {
+            throw new AdhaarValidationException('Session key is not generated');
+        }
+        if (! isset($this->user)) {
+            throw new AdhaarValidationException('User Must be set');
+        }
+        // $this->user = $user;
         if (! in_array('aes-256-gcm', openssl_get_cipher_methods())) {
             throw new AdhaarNotSupportedException('aes-256-gcm support is needed');
         }
 
         if (! $this->enableProtoBuf) {
-            $xmlPid = serialize($this->user);
+            // $xmlPid = utf8_encode($this->user->serialize());
+            $xmlPid = $this->user->serialize();
+            // $xmlPid='<Pid ts="2014-01-03T19:57:45"><pi dob="13-05-1968" name="Shivshankar Choudhury"/></Pid>';
+            file_put_contents('src/Storage/Debug/pid.xml', $xmlPid);
             // encrypt
             $iv = $this->user->getTs();
-            openssl_encrypt($xmlPid, 'aes-256-gcm', $this->session, OPENSSL_ZERO_PADDING, $iv, $tag);
-            $encryptedXmlPid = $xmlPid;
+            $encryptedXmlPid = openssl_encrypt($xmlPid, 'aes-256-gcm', $this->session, OPENSSL_ZERO_PADDING, $iv, $tag);
+            // var_dump($encryptedXmlPid);
+            // $xm=openssl_decrypt($encryptedXmlPid, 'aes-256-gcm', $this->session,OPENSSL_ZERO_PADDING, $iv, $tag);var_dump($xm);
+
             $this->pid = base64_encode($encryptedXmlPid);
             return;
         }
@@ -213,8 +240,8 @@ class AdhaarAuthRequest implements \Serializable
      */
     public function generateEndpoint()
     {
-        $endpoint = sprintf('%s/%s/%s/%s/%s/%s', self::TEST_ADHAAR_ENDPOINT, self::API_VERSION_2, 'public', $this->user->getAdhaarNumber()[0], $this->user->getAdhaarNumber()[1], urlencode(self::TEST_ASA_LICENSE_KEY));
-        //var_dump($endpoint);
+        $endpoint = sprintf('%s/%s/%s/%s/%s/%s', self::TEST_ADHAAR_ENDPOINT, $this->apiVersion, 'public', $this->user->getAdhaarNumber()[0], $this->user->getAdhaarNumber()[1], urlencode(self::TEST_ASA_LICENSE_KEY));
+        // var_dump($endpoint);
         return $endpoint;
     }
 
@@ -239,15 +266,16 @@ class AdhaarAuthRequest implements \Serializable
 
     public function serialize()
     {
+        $this->generateSessionKey();
         $this->generateTransactionId();
         $this->generateMetaUdc();
         $this->generateCertificateExpiry();
-        $this->generateSessionKey();
-        $this->generateHmac($this->user);
-        $this->generatePidBlock($this->user);
+        $this->generateHmac();
+        $this->generatePidBlock();
 
         $this->xmlWriter->openMemory();
-        // $this->xmlWriter->startDocument("1.0");
+        // start doc
+        $this->xmlWriter->startDocument("1.0", "utf-8");
         /*
          * Auth Block uid="" rc="" tid="" ac="" sa="" ver="" txn="" lk=""
          */
@@ -313,6 +341,8 @@ class AdhaarAuthRequest implements \Serializable
 
         // Auth End
         $this->xmlWriter->endElement();
+        // Doc end
+        $this->xmlWriter->endDocument();
         return $this->xmlWriter->outputMemory();
     }
 
@@ -325,36 +355,42 @@ class AdhaarAuthRequest implements \Serializable
      */
     public function sign()
     {
-        // Load the XML to be signed
-        $doc = new \DOMDocument();
-        // s=$this->serialize();
-        // file_put_contents('test.xml', $rs);
-        $doc->loadXML($this->serialize());
+        if (! $this->isSealed) {
+            // Load the XML to be signed
+            $doc = new \DOMDocument();
+            // s=$this->serialize();
+            // file_put_contents('test.xml', $rs);
+            $doc->loadXML($this->serialize());
 
-        // Use the c14n exclusive canonicalization
-        $this->xmlSigner->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);
-        // Sign using SHA-256
-        $this->xmlSigner->addReference($doc, XMLSecurityDSig::SHA256, [
-            'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
-            'http://www.w3.org/2001/10/xml-exc-c14n#'
-        ], [
-            'force_uri' => true
-        ]);
+            // Use the c14n exclusive canonicalization
+            $this->xmlSigner->setCanonicalMethod(XMLSecurityDSig::EXC_C14N);
+            // Sign using SHA-256
+            $this->xmlSigner->addReference($doc, XMLSecurityDSig::SHA256, [
+                'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+                'http://www.w3.org/2001/10/xml-exc-c14n#'
+            ], [
+                'force_uri' => true
+            ]);
 
-        // Create a new (private) Security key
-        $xmlObjKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA256, [
-            'type' => 'private'
-        ]);
+            // Create a new (private) Security key
+            $xmlObjKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA256, [
+                'type' => 'private'
+            ]);
 
-        // Append the signature to the XML
-        // $objDSig->appendSignature($doc->documentElement);
-        // Save the signed XML
-        $key = '';
-        $succ = openssl_pkcs12_read(file_get_contents($this->xmlSignerPath), $key, "public");
-        // var_dump(file_exists($this->xmlSignerPath),$key,$succ); die();
-        $xmlObjKey->loadKey($key["pkey"]);
-        $this->xmlSigner->add509Cert($key["cert"]);
-        $this->xmlSigner->sign($xmlObjKey, $doc->documentElement);
-        return $doc->saveXML();
+            // Append the signature to the XML
+            // $objDSig->appendSignature($doc->documentElement);
+            // Save the signed XML
+            $key = '';
+            $succ = openssl_pkcs12_read(file_get_contents($this->xmlSignerPath), $key, "public");
+            // var_dump(file_exists($this->xmlSignerPath),$key,$succ); die();
+            $xmlObjKey->loadKey($key["pkey"]);
+            $this->xmlSigner->add509Cert($key["cert"]);
+            $this->xmlSigner->sign($xmlObjKey, $doc->documentElement);
+
+            $this->isSealed = true;
+            return $doc->saveXML();
+        }
+
+        throw new AdhaarValidationException('Paylaod is already signed');
     }
 }

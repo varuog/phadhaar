@@ -10,7 +10,6 @@ namespace Phadhaar\Service;
 use Phadhaar\Exception\AdhaarNotSupportedException;
 use phpDocumentor\Reflection\Types\String_;
 use Phadhaar\Model\User;
-use src\Service\AdhaarAuthResponse;
 use GuzzleHttp;
 
 /**
@@ -20,11 +19,6 @@ use GuzzleHttp;
  */
 class AdhaarAuthService
 {
-
-    const API_VERSION_2 = '2.0';
-
-    const TEST_ADHAAR_ENDPOINT = 'http://auth.uidai.gov.in';
-
     /**
      * <Auth uid="" rc="" tid="" ac="" sa="" ver="" txn="" lk="">
      * <Uses pi="" pa="" pfa="" bio="" bt="" pin="" otp=""/>
@@ -36,6 +30,8 @@ class AdhaarAuthService
      * </Auth
      */
     // put your code here
+    const DEBUG_MODE=1;
+    
     protected $httpService;
 
     protected $config;
@@ -58,20 +54,24 @@ class AdhaarAuthService
     {
         $endpoint = $adhaarRequest->generateEndpoint();
         var_dump($endpoint);
+        //$adhaarRequest->sign();
+        $authPaylaodSigned= $adhaarRequest->sign();
+        
+        file_put_contents('src/Storage/Debug/request.xml',$authPaylaodSigned);
 
         $options = [];
-        try {
             $response = $this->httpService->post($endpoint, [
-                'body' => serialize($adhaarRequest),
+                'body' => $authPaylaodSigned,
                 'headers' => [
                     'Content-Type' => 'applciation/xml'
                 ]
             ]);
-        } catch (\Exception $exp) {
-            //var_dump($exp);
-        }
-        var_dump($response);
-        die();
-        return new AdhaarAuthResponse($response);
+        
+            
+        $adhaarResponse=new AdhaarAuthResponse($response->getBody());
+        //var_dump($adhaarResponse->getRawResponse());
+        file_put_contents('src/Storage/Debug/response.xml', $adhaarResponse->getRawResponse());
+        
+        return $adhaarResponse;
     }
 }
