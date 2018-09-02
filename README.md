@@ -1,14 +1,23 @@
 # phadhaar
 
+##Description
+Adhaar Authentication for API 2.5 using PHP
 
-# Sample Code
+## Installation
+
+Add the Laravel Facebook SDK package to your `composer.json` file.
+
+    composer require varuog/phadhaar
+
+
+## Sample Code
 ```PHP
-$user = new User();
+$adhaarNumber='999941057058';
+$user = new User($adhaarNumber);
 $user->setEmail('sschoudhury@dummyemail.com');
 $user->setGender(User::GENDER_MALE);
 $user->setDob('13-05-1968');
 $user->setName('Shivshankar Choudhury');
-$user->setAdhaarNumber('999941057058');
         
 $httpService=new Client();
 $adhaarRequest=new AdhaarAuthRequest($user);

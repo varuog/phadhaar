@@ -31,6 +31,15 @@ class AdhaarAuthResponse
     {
         return $this->simpleXml;
     }
+    
+    /**
+     * 
+     * @return boolean
+     */
+    public function isAuthenticated()
+    {
+        return strcasecmp($this->simpleXml['ret'], 'y')==0 ? true: false;
+    }
 
 }
 
