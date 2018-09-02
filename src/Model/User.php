@@ -177,8 +177,9 @@ class User implements \Serializable
      */
     protected $xmlWriter;
 
-    public function __construct()
+    public function __construct($adhaarCardNumber)
     {
+        $this->adhaarNumber=$adhaarCardNumber;
         /*
          * YYYY-MM-DDThh:mm:ss
          */

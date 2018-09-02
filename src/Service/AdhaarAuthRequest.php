@@ -39,6 +39,8 @@ class AdhaarAuthRequest implements \Serializable
     const CERT_PATH = 'src/Storage/uidai_auth_stage.cer';
 
     const XML_SIGNER_PATH = 'src/Storage/Staging_Signature_PrivateKey.p12';
+    
+    const NS_AUTH_REQ_2="http://www.uidai.gov.in/authentication/uid-auth-request/2.0";
 
     /**
      * <Auth uid="" rc="" tid="" ac="" sa="" ver="" txn="" lk="">
@@ -121,7 +123,7 @@ class AdhaarAuthRequest implements \Serializable
     public function __construct(User $user, $config = [])
     {
         $this->xmlWriter = new \XMLWriter();
-        $this->xmlSigner = new XMLSecurityDSig();
+        $this->xmlSigner = new XMLSecurityDSig('');
         $this->certificatePath = realpath(static::CERT_PATH);
         $this->xmlSignerPath = realpath(static::XML_SIGNER_PATH);
         $this->user = $user;
@@ -151,22 +153,33 @@ class AdhaarAuthRequest implements \Serializable
     protected function generateCertificateExpiry()
     {
         $certinfo = openssl_x509_parse(file_get_contents($this->certificatePath));
+        // var_dump($certinfo);
         $this->certificateExpiryDate = \Carbon\Carbon::parse('@' . $certinfo['validTo_time_t'])->format('Ymd');
     }
 
     /**
+     * package in.gov.uidai.auth.device.helper;
      */
     protected function generateSessionKey()
     {
         /*
          * Generate 256 bit session key
          */
-        $this->session = openssl_random_pseudo_bytes(128, $cryptStrength);
+        $this->session = bin2hex(openssl_random_pseudo_bytes(32, $cryptStrength));
+        // var_dump(strlen(bin2hex($this->session)));
 
+        /**
+         * Encrypt session using public key
+         * @var string $crypted
+         */
         $crypted = '';
         $publicKeyRes = openssl_pkey_get_public(file_get_contents($this->certificatePath));
         $publicKeyDetails = openssl_pkey_get_details($publicKeyRes); // openssl_pkey_get_details
         $res = openssl_public_encrypt($this->session, $crypted, $publicKeyDetails['key']);
+
+        if (! $res) {
+            throw new AdhaarValidationException('Unable to encrypt session key');
+        }
         $this->sessionKey = base64_encode($crypted);
         // var_dump($res,$publicKeyDetails);
     }
@@ -280,6 +293,7 @@ class AdhaarAuthRequest implements \Serializable
          * Auth Block uid="" rc="" tid="" ac="" sa="" ver="" txn="" lk=""
          */
         $this->xmlWriter->startElement('Auth');
+        $this->xmlWriter->writeAttribute('xmlns', static::NS_AUTH_REQ_2);
         $this->xmlWriter->writeAttribute('uid', $this->user->getAdhaarNumber());
         $this->xmlWriter->writeAttribute('rc', $this->consent);
         $this->xmlWriter->writeAttribute('tid', $this->tid);
@@ -369,7 +383,8 @@ class AdhaarAuthRequest implements \Serializable
                 'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
                 'http://www.w3.org/2001/10/xml-exc-c14n#'
             ], [
-                'force_uri' => true
+                'force_uri' => true,
+                //'prefix_ns' => '',
             ]);
 
             // Create a new (private) Security key
@@ -385,6 +400,7 @@ class AdhaarAuthRequest implements \Serializable
             // var_dump(file_exists($this->xmlSignerPath),$key,$succ); die();
             $xmlObjKey->loadKey($key["pkey"]);
             $this->xmlSigner->add509Cert($key["cert"]);
+            //$this->xmlSigner->add509Cert(file_get_contents($this->certificatePath));
             $this->xmlSigner->sign($xmlObjKey, $doc->documentElement);
 
             $this->isSealed = true;

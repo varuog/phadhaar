@@ -27,12 +27,12 @@ class UserTest extends TestCase
 
     public function testUserWithDemography()
     {
-        $user = new User();
+        $user = new User('999941057058');
         $user->setEmail('sschoudhury@dummyemail.com');
         $user->setGender(User::GENDER_MALE);
         $user->setDob('13-05-1968');
         $user->setName('Shivshankar Choudhury');
-        $user->setAdhaarNumber('999941057058');
+        //$user->setAdhaarNumber('999941057058');
 
        // $this->assertEquals(1, serialize($user));
     }
